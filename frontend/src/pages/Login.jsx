@@ -17,7 +17,8 @@ export default function LogIn() {
             </p>
             
             <button type="submit">Log In</button>
-            
+            {/* <button type="submit"><Link to="/application" className='link1'>Log In</Link></button> */}
+
             <p className='btn'>Don't have an account? <br></br> 
                 <Link to="/signup" className='link'>Register Now</Link>
             </p> 

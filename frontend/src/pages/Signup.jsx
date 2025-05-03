@@ -27,6 +27,7 @@ export default function SignUp() {
             </p>
 
             <button type="submit">Register</button>
+            {/* <button type="submit"><Link to="/application" className='link1'>Register</Link></button> */}
 
             {/* <p>Already have an account?</p>
             <a href="LogIn.jsx">LogIn</a> */}
