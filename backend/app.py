@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-###---> handling signup form functionalities
+###---> (1)handling signup form functionalities
 signup_data = []
 
 # Pydantic model for form data
@@ -49,7 +49,6 @@ class DataForm(BaseModel):
             raise ValueError("Passwords do not match")
         return v
     
-
 # POST endpoint to receive signup form data
 @app.post("/submit")
 async def submit_form(data: DataForm):
@@ -65,3 +64,31 @@ async def submit_form(data: DataForm):
 @app.get("/data")
 async def get_data():
     return signup_data
+
+###--> (2) application form data handling
+application_data = []
+
+# Pydantic model for form data
+class ApplicationForm(BaseModel):
+    name: str
+    email: EmailStr #built in Pydantic type for email validation
+    mobile: int
+    # file: cv file?
+    job: str
+    
+# POST endpoint to receive form data
+@app.post("/application-submit")
+async def submit_form(data: ApplicationForm):
+    try:
+        application_data.append(data)
+        return {"message": "Data received", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # signup_data.append(data)
+    # return {"message": "Data received", "data": data}
+
+# GET endpoint to retrieve all form data
+@app.get("/application-data")
+async def get_data():
+    return application_data
+
