@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, SecretStr, EmailStr, validator
 from fastapi.middleware.cors import CORSMiddleware
 import re
+import pymysql
 
 app = FastAPI()
 
@@ -16,11 +17,37 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],  #["*"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+#database configuration  -->venv\Scripts\activate-->pip install fastapi uvicorn pymysql  
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "job_tracker"
+}
+
+def get_db():
+    conn = pymysql.connect(**db_config)
+    try:
+        yield conn
+    finally:
+        conn.close()
+        
+# Test the db connection
+@app.get("/test-db")
+async def test_db(db: pymysql.connections.Connection = Depends(get_db)):
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            return {"message": "Database connection successful", "result": result[0]}
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
 ###---> (1)handling signup form functionalities
 signup_data = []
