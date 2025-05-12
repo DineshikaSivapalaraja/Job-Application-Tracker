@@ -19,3 +19,6 @@ pip install fastapi uvicorn pymysql passlib[bcrypt] pyjwt
 pip install python-dotenv
 
 python generate_key.py --> to get the secret key
+
+pip freeze > requirements.txt or pip install -r requirements.txt -->to get list of python dependencies
+
