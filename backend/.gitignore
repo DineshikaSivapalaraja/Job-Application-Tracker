@@ -7,7 +7,7 @@ ENV/
 .env/
 
 .env
-.env.*
+# .env.*
 
 __pydantic__/ 
 
