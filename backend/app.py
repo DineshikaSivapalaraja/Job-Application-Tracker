@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel, SecretStr, EmailStr, validator
 from fastapi.middleware.cors import CORSMiddleware
 import re
@@ -7,9 +7,11 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
-from typing import Dict
+# from typing import Dict
 from dotenv import load_dotenv
 import os
+import shutil
+import uuid
 
 app = FastAPI()
 
@@ -35,9 +37,15 @@ db_config = {
     "host": "localhost",
     "user": "root",
     "password": "",
-    "database": "job_tracker"
+    "database": "job_tracker",
+    "charset": "utf8mb4"
 }
 
+#local storage for pdf
+PDF_DIR = "D:\\job-tracker-resumes"
+os.makedirs(PDF_DIR, exist_ok=True)
+
+#database connection
 def get_db():
     conn = pymysql.connect(**db_config)
     try:
@@ -68,10 +76,7 @@ async def test_db(db: pymysql.connections.Connection = Depends(get_db)):
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
-###---> (1)handling signup form functionalities
-signup_data = []
-
-# Pydantic model for form data
+# Pydantic model for Signup form 
 class UserDataForm(BaseModel):
     name: str
     email: EmailStr #built in Pydantic type for email validation
@@ -95,15 +100,36 @@ class UserDataForm(BaseModel):
             raise ValueError("Passwords do not match")
         return v
     
+#pydantic model for Signup form response
 class UserResponse(BaseModel):
     id: int
     name: str
     email: EmailStr
     role: str
-    
+
+#pydantic model for Login form
 class LoginForm(BaseModel):
     email: EmailStr
     password: SecretStr
+    
+#pydantic model for Application form
+class ApplicationForm(BaseModel):
+    name: str
+    email: EmailStr 
+    mobile: str
+    # file: cv file?
+    job: str
+
+#pydantic model for Application form response
+class ApplicationResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    email: EmailStr 
+    mobile: int
+    cv_path: str
+    job: str
+    status: str
 
 #JWT authentication
 def create_access_token(data: dict):
@@ -125,6 +151,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return {"user_id": user_id, "role": role}
 
 # endpoints to ensure the authentication
+###---> (1)handling Signup form 
 @app.post("/signup", response_model=UserResponse)
 async def signup(data: UserDataForm, db: pymysql.connections.Connection = Depends(get_db)):
     try:
@@ -143,6 +170,7 @@ async def signup(data: UserDataForm, db: pymysql.connections.Connection = Depend
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+###---> (2)handling Login form --endpoints to ensure the authentication
 @app.post("/login")
 async def login(data: LoginForm, db: pymysql.connections.Connection = Depends(get_db)):
     try:
@@ -160,46 +188,64 @@ async def login(data: LoginForm, db: pymysql.connections.Connection = Depends(ge
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
-# POST endpoint to receive signup form data
-@app.post("/submit")
-async def submit_form(data: UserDataForm):
-    try:
-        signup_data.append(data)
-        return {"message": "Data received", "data": data}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    # signup_data.append(data)
-    # return {"message": "Data received", "data": data}
-
-# GET endpoint to retrieve all signup form data
-@app.get("/data")
-async def get_data():
-    return signup_data
-
-###--> (2) application form data handling
-application_data = []
-
-# Pydantic model for form data
-class ApplicationForm(BaseModel):
-    name: str
-    email: EmailStr #built in Pydantic type for email validation
-    mobile: int
-    # file: cv file?
-    job: str
+###---> (3)handling Application form 
+@app.post("/application-submit", response_model=ApplicationResponse)
+async def submit_application(
+    name: str = Form(...),
+    # email: str = Form(...),
+    email: EmailStr = Form(...),
+    mobile: str = Form(...),
+    job: str = Form(...),
+    cv: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: pymysql.connections.Connection = Depends(get_db)
     
-# POST endpoint to receive form data
-@app.post("/application-submit")
-async def submit_form(data: ApplicationForm):
+):
+    #to validate the pdf
+    if cv.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="CV must be a PDF")
+    
+    #validate form data with pydantic 
     try:
-        application_data.append(data)
-        return {"message": "Data received", "data": data}
-    except Exception as e:
+        form_data = ApplicationForm(name=name, email=email, mobile=mobile, job=job)
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    # signup_data.append(data)
-    # return {"message": "Data received", "data": data}
 
-# GET endpoint to retrieve all form data
-@app.get("/application-data")
-async def get_data():
-    return application_data
+    #generate unique filename for CV
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = str(uuid.uuid4())[:8]
+    cv_name = f"{timestamp}_{unique_id}.pdf"
+    cv_path = os.path.join(PDF_DIR, cv_name)
+    
+    #save pdf 
+    with open(cv_path, "wb") as f:
+        shutil.copyfileobj(cv.file, f)
+    
+    #store in database
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO applications (user_id, name, email, mobile, cv_path, job, status) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (current_user["user_id"], form_data.name, form_data.email, form_data.mobile, cv_path, form_data.job, "Applied")
+            )
+            db.commit()
+            cursor.execute("SELECT LAST_INSERT_ID()")
+            app_id = cursor.fetchone()[0]
+            
+        return ApplicationResponse(
+            id=app_id,
+            user_id=current_user["user_id"],
+            name=form_data.name,
+            email=form_data.email,
+            mobile=form_data.mobile,
+            cv_path=cv_path,
+            job=form_data.job,
+            status="Applied"
+        )
+    except pymysql.MySQLError as e:
+        # clean up file if database fails
+        if os.path.exists(cv_path):
+            os.remove(cv_path)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
