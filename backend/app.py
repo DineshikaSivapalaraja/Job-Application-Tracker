@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import os
 import shutil
 import uuid
+import logging
 
 app = FastAPI()
 
@@ -119,6 +120,12 @@ class ApplicationForm(BaseModel):
     mobile: str
     # file: cv file?
     job: str
+    
+    # @validator("mobile")
+    # def validate_mobile(cls, v: str):
+    #     if not re.match(r"^\+?\d{9,15}$", v):
+    #         raise ValueError("Mobile must be a valid phone number (e.g., +9478709709)")
+    #     return v
 
 #pydantic model for Application form response
 class ApplicationResponse(BaseModel):
@@ -126,11 +133,15 @@ class ApplicationResponse(BaseModel):
     user_id: int
     name: str
     email: EmailStr 
-    mobile: int
+    mobile: str
     cv_path: str
     job: str
     status: str
-
+    
+#pydantic model for Application list response
+class ApplicationListResponse(BaseModel):
+    applications: list[ApplicationResponse]
+    
 #JWT authentication
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -201,14 +212,22 @@ async def submit_application(
     db: pymysql.connections.Connection = Depends(get_db)
     
 ):
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received token: {current_user}")
+    logger.info(f"Received form data: name={name}, email={email}, mobile={mobile}, job={job}")
+    logger.info(f"File: {cv.filename}, Content-Type: {cv.content_type}")
+
     #to validate the pdf
     if cv.content_type != "application/pdf":
+        logger.error("Non-PDF file uploaded")
         raise HTTPException(status_code=400, detail="CV must be a PDF")
     
     #validate form data with pydantic 
     try:
         form_data = ApplicationForm(name=name, email=email, mobile=mobile, job=job)
     except ValueError as e:
+        logger.error(f"Form validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
     #generate unique filename for CV
@@ -243,9 +262,23 @@ async def submit_application(
             status="Applied"
         )
     except pymysql.MySQLError as e:
+        logger.error(f"Database error: {e}")
         # clean up file if database fails
         if os.path.exists(cv_path):
             os.remove(cv_path)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-
+@app.get("/applications", response_model=ApplicationListResponse)
+async def get_applications(current_user: dict = Depends(get_current_user), db: pymysql.connections.Connection = Depends(get_db)):
+    try:
+        with db.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE user_id = %s",
+                (current_user["user_id"],)
+            )
+            applications = cursor.fetchall()
+            if not applications:
+                raise HTTPException(status_code=404, detail="No applications found")
+            return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
