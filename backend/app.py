@@ -59,6 +59,9 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")  #secure secret key
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not define in the .env file.")
+ADMIN_CODE = os.getenv("ADMIN_CODE")
+if not ADMIN_CODE:
+    raise ValueError("ADMIN_CODE environment variable is not define in the .env file.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -103,6 +106,10 @@ class UserDataForm(BaseModel):
             raise ValueError("Passwords do not match")
         return v
     
+#pydantic model for admin signup form
+class AdminSignupForm(UserDataForm):
+    admin_code: str
+
 #pydantic model for Signup form response
 class UserResponse(BaseModel):
     id: int
@@ -200,6 +207,28 @@ async def signup(data: UserDataForm, db: pymysql.connections.Connection = Depend
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+###---> (6)handling Admin Signup
+@app.post("/admin-signup", response_model=UserResponse)
+async def admin_signup(data: AdminSignupForm, db: pymysql.connections.Connection = Depends(get_db)):
+    if data.admin_code != ADMIN_CODE:
+        raise HTTPException(status_code=403, detail="Invalid admin code")
+    
+    try:
+        with db.cursor() as cursor:
+            hashed_password = pwd_context.hash(data.password.get_secret_value())
+            cursor.execute(
+                "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
+                (data.name, data.email, hashed_password, "admin")
+            )
+            db.commit()
+            cursor.execute("SELECT LAST_INSERT_ID()")
+            user_id = cursor.fetchone()[0]
+        return {"id": user_id, "name": data.name, "email": data.email, "role": "admin"}
+    except pymysql.err.IntegrityError:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
 ###---> (2)handling Login form --endpoints to ensure the authentication
 @app.post("/login")
 async def login(data: LoginForm, db: pymysql.connections.Connection = Depends(get_db)):
@@ -287,6 +316,7 @@ async def submit_application(
             os.remove(cv_path)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+###---> (4)listing the applications(applicant can view their own appplications)
 @app.get("/applications", response_model=ApplicationListResponse)
 async def get_applications(current_user: dict = Depends(get_current_user), db: pymysql.connections.Connection = Depends(get_db)):
     try:
@@ -302,6 +332,7 @@ async def get_applications(current_user: dict = Depends(get_current_user), db: p
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+###---> (5)admin updates applications status 
 @app.put("/applications/{app_id}", response_model=ApplicationResponse)
 async def update_application_status(
     app_id: int,
