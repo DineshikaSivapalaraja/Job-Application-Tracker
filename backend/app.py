@@ -57,6 +57,8 @@ def get_db():
 #JWT settings
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")  #secure secret key
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not define in the .env file.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -142,6 +144,17 @@ class ApplicationResponse(BaseModel):
 class ApplicationListResponse(BaseModel):
     applications: list[ApplicationResponse]
     
+#pydantic model for application status
+class UpdateApplicationStatus(BaseModel):
+    status: str
+    
+    @validator("status")
+    def validate_status(cls, v:str):
+        valid_statuses = {"Applied", "Viewed", "Resume Downloaded","Interview Scheduled", "Rejected", "Offered"}
+        if v not in valid_statuses:
+            raise ValueError(f"Status must be one of {valid_statuses}")
+        return v
+ 
 #JWT authentication
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -160,6 +173,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     return {"user_id": user_id, "role": role}
+
+async def get_current_admin(token: str = Depends(oauth2_scheme)):
+    user = await get_current_user(token)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
 
 # endpoints to ensure the authentication
 ###---> (1)handling Signup form 
@@ -280,5 +299,51 @@ async def get_applications(current_user: dict = Depends(get_current_user), db: p
             if not applications:
                 raise HTTPException(status_code=404, detail="No applications found")
             return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.put("/applications/{app_id}", response_model=ApplicationResponse)
+async def update_application_status(
+    app_id: int,
+    update_data: UpdateApplicationStatus,
+    current_user: dict = Depends(get_current_admin),
+    db: pymysql.connections.Connection = Depends(get_db)
+):
+    try:
+        with db.cursor() as cursor:
+            # Check if application exists
+            cursor.execute(
+                "SELECT user_id, status FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            application = cursor.fetchone()
+            if not application:
+                raise HTTPException(status_code=404, detail="Application not found")
+
+            # Update the status
+            cursor.execute(
+                "UPDATE applications SET status = %s WHERE id = %s",
+                (update_data.status, app_id)
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=500, detail="Failed to update application")
+            db.commit()
+
+            # Fetch updated application details
+            cursor.execute(
+                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            updated_app = cursor.fetchone()
+            return ApplicationResponse(
+                id=updated_app[0],
+                user_id=updated_app[1],
+                name=updated_app[2],
+                email=updated_app[3],
+                mobile=updated_app[4],
+                cv_path=updated_app[5],
+                job=updated_app[6],
+                status=updated_app[7]
+            )
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
