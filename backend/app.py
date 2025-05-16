@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel, SecretStr, EmailStr, validator
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import re
 import pymysql
@@ -7,7 +8,6 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
-# from typing import Dict
 from dotenv import load_dotenv
 import os
 import shutil
@@ -15,6 +15,9 @@ import uuid
 import logging
 
 app = FastAPI()
+
+# In-memory token blacklist
+blacklisted_tokens = set()
 
 # @app.get("/")
 # async def get():
@@ -33,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#database configuration  -->venv\Scripts\activate-->pip install fastapi uvicorn pymysql  
+#database configuration   
 db_config = {
     "host": "localhost",
     "user": "root",
@@ -117,6 +120,31 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
 
+#pydantic model for Profile update form
+class ProfileUpdateForm(BaseModel):
+    name: str | None = None
+    email: EmailStr | None = None
+    password: SecretStr | None = None
+    cpassword: SecretStr | None = None
+    
+    @validator("password", always=True)
+    def validate_password(cls, v: SecretStr | None, values):
+        if v is None:
+            return v
+        password = v.get_secret_value()
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.match(r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]+$", password):
+            raise ValueError("Password must contain at least one letter, one number, and one symbol (@$!%*?&)")
+        return v
+
+    @validator("cpassword", always=True)
+    def passwords_match(cls, v: SecretStr | None, values):
+        if "password" in values and values["password"] is not None:
+            if v is None or v.get_secret_value() != values["password"].get_secret_value():
+                raise ValueError("Passwords do not match")
+        return v
+    
 #pydantic model for Login form
 class LoginForm(BaseModel):
     email: EmailStr
@@ -130,11 +158,11 @@ class ApplicationForm(BaseModel):
     # file: cv file?
     job: str
     
-    # @validator("mobile")
-    # def validate_mobile(cls, v: str):
-    #     if not re.match(r"^\+?\d{9,15}$", v):
-    #         raise ValueError("Mobile must be a valid phone number (e.g., +9478709709)")
-    #     return v
+    @validator("mobile")
+    def validate_mobile(cls, v: str):
+        if not re.match(r"^\+?\d{9,15}$", v):
+            raise ValueError("Mobile must be a valid phone number (e.g., +9478709709)")
+        return v
 
 #pydantic model for Application form response
 class ApplicationResponse(BaseModel):
@@ -161,7 +189,20 @@ class UpdateApplicationStatus(BaseModel):
         if v not in valid_statuses:
             raise ValueError(f"Status must be one of {valid_statuses}")
         return v
- 
+    
+#pydantic model for Application edit form
+class ApplicationEditForm(BaseModel):
+    name: str
+    email: EmailStr
+    mobile: str
+    job: str
+    
+    @validator("mobile")
+    def validate_mobile(cls, v: str):
+        if not re.match(r"^\+?\d{9,15}$", v):
+            raise ValueError("Mobile must be a valid phone number (e.g., +9478709709)")
+        return v
+
 #JWT authentication
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -394,6 +435,140 @@ async def update_application_status(
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
+###---> (10) Applicant can edit the application
+@app.put("/applications/{app_id}", response_model=ApplicationResponse)
+async def edit_application(
+    
+#     app_id: int,
+#     update_data: ApplicationEditForm,
+#     current_user: dict = Depends(get_current_user),
+#     db: pymysql.connections.Connection = Depends(get_db)
+# ):
+#     try:
+#         with db.cursor() as cursor:
+#             # Check if application exists and belongs to the user
+#             cursor.execute(
+#                 "SELECT user_id, status FROM applications WHERE id = %s",
+#                 (app_id,)
+#             )
+#             application = cursor.fetchone()
+#             if not application:
+#                 raise HTTPException(status_code=404, detail="Application not found")
+#             if current_user["user_id"] != application[0]:
+#                 raise HTTPException(status_code=403, detail="Not authorized to edit this application")
+#             if application[1] != "Applied":
+#                 raise HTTPException(status_code=400, detail="Can only edit applications with status 'Applied'")
+
+#             # Update the application details
+#             cursor.execute(
+#                 "UPDATE applications SET name = %s, email = %s, mobile = %s, job = %s WHERE id = %s",
+#                 (update_data.name, update_data.email, update_data.mobile, update_data.job, app_id)
+#             )
+#             if cursor.rowcount == 0:
+#                 raise HTTPException(status_code=500, detail="Failed to update application")
+#             db.commit()
+
+#             # Fetch updated application details
+#             cursor.execute(
+#                 "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE id = %s",
+#                 (app_id,)
+#             )
+#             updated_app = cursor.fetchone()
+#             return ApplicationResponse(
+#                 id=updated_app[0],
+#                 user_id=updated_app[1],
+#                 name=updated_app[2],
+#                 email=updated_app[3],
+#                 mobile=updated_app[4],
+#                 cv_path=updated_app[5],
+#                 job=updated_app[6],
+#                 status=updated_app[7]
+#             )
+#     except pymysql.MySQLError as e:
+#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    app_id: int,
+        name: str = Form(...),
+        email: EmailStr = Form(...),
+        mobile: str = Form(...),
+        job: str = Form(...),
+        cv: UploadFile = File(None),
+        current_user: dict = Depends(get_current_user),
+        db: pymysql.connections.Connection = Depends(get_db)
+    ):
+    # Validate form data with Pydantic
+    try:
+        form_data = ApplicationEditForm(name=name, email=email, mobile=mobile, job=job)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        with db.cursor() as cursor:
+            # Check if application exists and belongs to the user
+            cursor.execute(
+                "SELECT user_id, status, cv_path FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            application = cursor.fetchone()
+            if not application:
+                raise HTTPException(status_code=404, detail="Application not found")
+            if current_user["user_id"] != application[0]:
+                raise HTTPException(status_code=403, detail="Not authorized to edit this application")
+            if application[1] != "Applied":
+                raise HTTPException(status_code=400, detail="Can only edit applications with status 'Applied'")
+
+            # Handle CV update if provided
+            new_cv_path = application[2]  # Default to existing cv_path
+            if cv:
+                # Validate the new CV
+                if cv.content_type != "application/pdf":
+                    raise HTTPException(status_code=400, detail="CV must be a PDF")
+
+                # Delete the old CV file
+                old_cv_path = application[2]
+                if os.path.exists(old_cv_path):
+                    os.remove(old_cv_path)
+
+                # Generate new filename and save the new CV
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                unique_id = str(uuid.uuid4())[:8]
+                cv_name = f"{timestamp}_{unique_id}.pdf"
+                new_cv_path = os.path.join(PDF_DIR, cv_name)
+                with open(new_cv_path, "wb") as f:
+                    shutil.copyfileobj(cv.file, f)
+
+            # Update the application details
+            cursor.execute(
+                "UPDATE applications SET name = %s, email = %s, mobile = %s, job = %s, cv_path = %s WHERE id = %s",
+                (form_data.name, form_data.email, form_data.mobile, form_data.job, new_cv_path, app_id)
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=500, detail="Failed to update application")
+            db.commit()
+
+            # Fetch updated application details
+            cursor.execute(
+                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            updated_app = cursor.fetchone()
+            return ApplicationResponse(
+                id=updated_app[0],
+                user_id=updated_app[1],
+                name=updated_app[2],
+                email=updated_app[3],
+                mobile=updated_app[4],
+                cv_path=updated_app[5],
+                job=updated_app[6],
+                status=updated_app[7]
+            )
+    except pymysql.MySQLError as e:
+        # Clean up new CV file if database update fails
+        if cv and 'new_cv_path' in locals() and os.path.exists(new_cv_path):
+            os.remove(new_cv_path)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to handle CV file: {str(e)}")
+    
 ###---> (8)delete application
 @app.delete("/applications/{app_id}")
 async def delete_application(
@@ -434,7 +609,7 @@ async def delete_application(
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete CV file: {str(e)}")
     
-# (9) Download CV
+###---> (9) Download CV
 @app.get("/applications/{app_id}/cv")
 async def download_cv(
     app_id: int,
@@ -473,3 +648,72 @@ async def download_cv(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to access CV file: {str(e)}")
+
+###---> (11) View Profile
+@app.get("/profile", response_model=UserResponse)
+async def get_profile(current_user: dict = Depends(get_current_user), db: pymysql.connections.Connection = Depends(get_db)):
+    try:
+        with db.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT id, name, email, role FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            user = cursor.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            return user
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+###---> (12) Update Profile
+@app.put("/profile", response_model=UserResponse)
+async def update_profile(
+    update_data: ProfileUpdateForm,
+    current_user: dict = Depends(get_current_user),
+    db: pymysql.connections.Connection = Depends(get_db)
+):
+    try:
+        with db.cursor() as cursor:
+            # Fetch current user details
+            cursor.execute(
+                "SELECT name, email, password FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            user = cursor.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Prepare updated values
+            new_name = update_data.name if update_data.name is not None else user[0]
+            new_email = update_data.email if update_data.email is not None else user[1]
+            new_password = pwd_context.hash(update_data.password.get_secret_value()) if update_data.password else user[2]
+
+            # Update user in database
+            cursor.execute(
+                "UPDATE users SET name = %s, email = %s, password = %s WHERE id = %s",
+                (new_name, new_email, new_password, current_user["user_id"])
+            )
+            db.commit()
+
+            # Fetch updated user details
+            cursor.execute(
+                "SELECT id, name, email, role FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            updated_user = cursor.fetchone()
+            return UserResponse(
+                id=updated_user[0],
+                name=updated_user[1],
+                email=updated_user[2],
+                role=updated_user[3]
+            )
+    except pymysql.err.IntegrityError:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+###---> (13) Logout
+@app.post("/logout")
+async def logout(token: str = Depends(oauth2_scheme)):
+    blacklisted_tokens.add(token)
+    return JSONResponse(status_code=200, content={"message": "Successfully logged out"})
