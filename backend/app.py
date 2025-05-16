@@ -332,6 +332,21 @@ async def get_applications(current_user: dict = Depends(get_current_user), db: p
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+###---> (7)admin view of all applications
+@app.get("/admin/applications", response_model=ApplicationListResponse)
+async def get_all_applications(current_user: dict = Depends(get_current_admin), db: pymysql.connections.Connection = Depends(get_db)):
+    try:
+        with db.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications"
+            )
+            applications = cursor.fetchall()
+            if not applications:
+                raise HTTPException(status_code=404, detail="No applications found")
+            return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 ###---> (5)admin updates applications status 
 @app.put("/applications/{app_id}", response_model=ApplicationResponse)
 async def update_application_status(
