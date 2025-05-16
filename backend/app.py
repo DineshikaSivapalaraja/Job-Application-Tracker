@@ -393,3 +393,43 @@ async def update_application_status(
             )
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+###---> (8)delete application
+@app.delete("/applications/{app_id}")
+async def delete_application(
+    app_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: pymysql.connections.Connection = Depends(get_db)   
+):
+    try:
+        with db.cursor() as cursor:
+            # Check if application exists
+            cursor.execute(
+                "SELECT user_id, cv_path FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            application = cursor.fetchone()
+            if not application:
+                raise HTTPException(status_code=404, detail="Application not found")
+
+            # Check ownership or admin privilege
+            if current_user["role"] != "admin" and current_user["user_id"] != application[0]:
+                raise HTTPException(status_code=403, detail="Not authorized to delete this application")
+
+            # Delete the CV file
+            cv_path = application[1]
+            if os.path.exists(cv_path):
+                os.remove(cv_path)
+
+            # Delete the application from the database
+            cursor.execute(
+                "DELETE FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            db.commit()
+
+            return {"message": "Application deleted successfully"}
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete CV file: {str(e)}")
