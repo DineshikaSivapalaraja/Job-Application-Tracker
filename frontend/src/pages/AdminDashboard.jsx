@@ -1,31 +1,81 @@
+import { useState, useEffect } from 'react';
+
 export default function AdminDashboard() {
-    return(
-        <>
+    const [applications, setApplications] = useState([]);
+    const [status, setStatus] = useState('');
+
+    useEffect(() => {
+        const fetchData = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const response = await fetch('http://localhost:8000/admin/applications', {
+            headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await response.json();
+            setApplications(data.applications);
+        } catch (err) {
+            console.error('Error fetching applications:', err);
+        }
+        };
+        fetchData();
+    }, []);
+
+    const handleStatusUpdate = async (appId) => {
+        const token = localStorage.getItem('token');
+        await fetch(`http://localhost:8000/applications/${appId}`, {
+        method: 'PUT',
+        headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ status }),
+        });
+        setApplications(applications.map(app => 
+        app.id === appId ? { ...app, status } : app
+        ));
+        setStatus('');
+    };
+
+    return (
         <div>
-            <h2>Applicants List</h2>
-            <table>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Mobile</th>
-                    <th>Job</th>
-                    <th>CV</th> {/* Download CV */}
-                    <th>Status</th>  {/* viewed downloaded shortlisted rejected */}
-                </tr>
-
-                <tr>
-
-                </tr>
-
-
-            </table>
-
-            {/* filter options to filter by jobs*/}
-
-            {/* <div>
-                <h2>User details</h2>
-            </div> */}
+        <h2>Applicants List</h2>
+        <table>
+            <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Mobile</th>
+            <th>Job</th>
+            <th>CV</th>
+            <th>Status</th>
+            </tr>
+            {applications.map((app) => (
+            <tr key={app.id}>
+                <td>{app.name}</td>
+                <td>{app.email}</td>
+                <td>{app.mobile}</td>
+                <td>{app.job}</td>
+                <td>
+                <a href={`http://localhost:8000/applications/${app.id}/cv`} download>
+                    Download
+                </a>
+                </td>
+                <td>
+                {app.status}
+                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="">Update Status</option>
+                    <option value="Applied">Applied</option>
+                    <option value="Viewed">Viewed</option>
+                    <option value="Resume Downloaded">Resume Downloaded</option>
+                    <option value="Interview Scheduled">Interview Scheduled</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Offered">Offered</option>
+                </select>
+                <button onClick={() => handleStatusUpdate(app.id)}>Update</button>
+                </td>
+            </tr>
+            ))}
+        </table>
         </div>
-        </>
     );
 }
