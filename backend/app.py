@@ -433,3 +433,43 @@ async def delete_application(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete CV file: {str(e)}")
+    
+# (9) Download CV
+@app.get("/applications/{app_id}/cv")
+async def download_cv(
+    app_id: int,
+    current_user: dict = Depends(get_current_admin),
+    db: pymysql.connections.Connection = Depends(get_db)
+):
+    try:
+        with db.cursor() as cursor:
+            # Check if application exists
+            cursor.execute(
+                "SELECT cv_path, status FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            application = cursor.fetchone()
+            if not application:
+                raise HTTPException(status_code=404, detail="Application not found")
+
+            cv_path = application[0]
+            if not os.path.exists(cv_path):
+                raise HTTPException(status_code=404, detail="CV file not found")
+
+            # Update status to "Resume Downloaded" if not already
+            if application[1] != "Resume Downloaded":
+                cursor.execute(
+                    "UPDATE applications SET status = %s WHERE id = %s",
+                    ("Resume Downloaded", app_id)
+                )
+                db.commit()
+
+            return FileResponse(
+                path=cv_path,
+                filename=os.path.basename(cv_path),
+                media_type="application/pdf"
+            )
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to access CV file: {str(e)}")
