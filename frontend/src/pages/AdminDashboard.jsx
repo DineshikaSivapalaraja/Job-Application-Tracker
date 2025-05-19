@@ -9,7 +9,8 @@ export default function AdminDashboard() {
         const token = localStorage.getItem('token');
         if (!token) return;
         try {
-            const response = await fetch('http://localhost:8000/admin/applications', {
+            // const response = await fetch('http://localhost:8000/admin/applications', {
+            const response = await fetch(`http://127.0.0.1:8000/admin/applications`, {
             headers: { Authorization: `Bearer ${token}` },
             });
             const data = await response.json();
@@ -23,7 +24,9 @@ export default function AdminDashboard() {
 
     const handleStatusUpdate = async (appId) => {
         const token = localStorage.getItem('token');
-        await fetch(`http://localhost:8000/applications/${appId}`, {
+        // await fetch(`http://localhost:8000/applications/${appId}`, {
+        const response = await fetch(`http://127.0.0.1:8000/admin/applications/${appId}`, {
+
         method: 'PUT',
         headers: { 
             'Content-Type': 'application/json',
@@ -56,7 +59,7 @@ export default function AdminDashboard() {
                 <td>{app.mobile}</td>
                 <td>{app.job}</td>
                 <td>
-                <a href={`http://localhost:8000/applications/${app.id}/cv`} download>
+                <a href={`http://127.0.0.1:8000/applications/${app.id}/cv`} download>
                     Download
                 </a>
                 </td>

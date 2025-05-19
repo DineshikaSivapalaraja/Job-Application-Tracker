@@ -8,7 +8,7 @@ export default function Logout() {
     const logout = async () => {
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch('http://localhost:8000/logout', {
+        await fetch(`http://127.0.0.1:8000/logout`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });

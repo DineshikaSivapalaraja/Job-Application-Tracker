@@ -14,13 +14,13 @@ export default function Profile() {
         return;
         }
         try {
-        const userResponse = await fetch('http://localhost:8000/profile', {
+        const userResponse = await fetch(`http://127.0.0.1:8000/profile`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         const userData = await userResponse.json();
         setUser(userData);
 
-        const appResponse = await fetch('http://localhost:8000/applications', {
+        const appResponse = await fetch(`http://127.0.0.1:8000/applications`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         const appData = await appResponse.json();
@@ -34,7 +34,7 @@ export default function Profile() {
 
     const handleDelete = async (appId) => {
     const token = localStorage.getItem('token');
-    await fetch(`http://localhost:8000/applications/${appId}`, {
+    await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
     });
@@ -49,7 +49,7 @@ export default function Profile() {
         <>
         <div>
             <h2>Profile</h2>
-            {/* <label>Name: </label>
+            {/* {/* {/* <label>Name: </label>
             <label>Email: </label>
             <label>Mobile: </label>
             <label>CV: </label>
@@ -84,10 +84,9 @@ export default function Profile() {
                     <button onClick={() => handleDelete(app.id)}>Delete</button>
                     </td>
                 </tr>
-                ))}
+                ))} 
             </table>
         </div>
         </>
-
     );
 }
