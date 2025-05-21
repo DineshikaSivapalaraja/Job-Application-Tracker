@@ -24,8 +24,7 @@ export default function AdminDashboard() {
 
     const handleStatusUpdate = async (appId) => {
         const token = localStorage.getItem('token');
-        // await fetch(`http://localhost:8000/applications/${appId}`, {
-        const response = await fetch(`http://127.0.0.1:8000/admin/applications/${appId}`, {
+        const response = await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
 
         method: 'PUT',
         headers: { 
@@ -34,14 +33,48 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({ status }),
         });
-        setApplications(applications.map(app => 
-        app.id === appId ? { ...app, status } : app
-        ));
-        setStatus('');
+        // setApplications(applications.map(app => 
+        // app.id === appId ? { ...app, status } : app
+        // ));
+        // setStatus('');
+        if (response.ok) {
+            setApplications(
+                applications.map((app) =>
+                app.id === appId ? { ...app, status } : app
+                )
+            );
+            setStatus('');
+            } else {
+            const data = await response.json();
+            console.error('Failed to update status:', data.detail);
+    }
+    };
+
+    const handleDownloadCV = async (appId) => {
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/applications/${appId}/cv`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+            throw new Error('Failed to download CV');
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cv_${appId}.pdf`; 
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        } catch (err) {
+        console.error('Error downloading CV:', err);
+        }
     };
 
     return (
-        <div>
+        <div >
         <h2>Applicants List</h2>
         <table>
             <tr>
@@ -59,9 +92,10 @@ export default function AdminDashboard() {
                 <td>{app.mobile}</td>
                 <td>{app.job}</td>
                 <td>
-                <a href={`http://127.0.0.1:8000/applications/${app.id}/cv`} download>
+                {/* <a href={`http://127.0.0.1:8000/applications/${app.id}/cv`} download>
                     Download
-                </a>
+                </a> */}
+                    <button onClick={() => handleDownloadCV(app.id)}>Download</button>
                 </td>
                 <td>
                 {app.status}
