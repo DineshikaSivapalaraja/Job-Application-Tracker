@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function ApplicationForm() {
   const [name, setName] = useState('');
@@ -9,6 +9,40 @@ export default function ApplicationForm() {
   const [cv, setCv] = useState(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const appId = params.get('edit');
+    if (appId) {
+      const fetchApplication = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+        try {
+          const response = await fetch(`http://127.0.0.1:8000/applications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await response.json();
+          const app = data.applications.find((a) => a.id === parseInt(appId));
+          if (app) {
+            setName(app.name);
+            setEmail(app.email);
+            setMobile(app.mobile);
+            setJob(app.job);
+            // Note: CV cannot be pre-filled due to browser security restrictions
+          } else {
+            setError('Application not found');
+          }
+        } catch (err) {
+          setError('Error fetching application data');
+        }
+      };
+      fetchApplication();
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,19 +60,27 @@ export default function ApplicationForm() {
       return;
     }
 
+    const params = new URLSearchParams(location.search);
+    const appId = params.get('edit');
+    const isEditing = !!appId;
+
     const formData = new FormData();
     formData.append('name', name);
     formData.append('email', email);
     formData.append('mobile', mobile);
     formData.append('job', job);
-    if (cv) formData.append('cv', cv);
+    if (cv) formData.append('file', cv);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/application-submit', {
-        method: 'POST',
+      const url = isEditing
+        ? `http://127.0.0.1:8000/applications/${appId}`
+        : 'http://127.0.0.1:8000/application-submit';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`
-          // Do NOT set Content-Type header here for multipart/form-data; browser sets it automatically
         },
         body: formData,
       });
@@ -47,17 +89,18 @@ export default function ApplicationForm() {
         navigate('/success');
       } else {
         const data = await response.json();
-        setError(data.detail || 'Submission failed');
+        setError(data.detail || `Submission failed (Status: ${response.status})`);
       }
     } catch (err) {
-      setError('An error occurred');
+      setError('Network error occurred. Please try again.');
+      console.error('Fetch error:', err);
     }
   };
 
   return (
     <div>
       <form className="form-box" onSubmit={handleSubmit}>
-        <h2>Application Form</h2>
+        <h2>{location.search.includes('edit') ? 'Edit Application' : 'Application Form'}</h2>
         {error && <p style={{ color: 'red' }}>{error}</p>}
 
         <p>
@@ -100,7 +143,7 @@ export default function ApplicationForm() {
             accept=".pdf"
             name="file"
             onChange={(e) => setCv(e.target.files[0])}
-            required
+            required={!location.search.includes('edit')} // Not required when editing
           />
         </p>
 
@@ -129,7 +172,7 @@ export default function ApplicationForm() {
           </select>
         </p>
 
-        <button type="submit">Submit</button>
+        <button type="submit">{location.search.includes('edit') ? 'Update' : 'Submit'}</button>
       </form>
     </div>
   );
