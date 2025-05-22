@@ -142,7 +142,7 @@ export default function ApplicationForm() {
             accept=".pdf"
             name="cv"
             onChange={(e) => setCv(e.target.files[0])}
-            required={!location.search.includes('edit')} // Not required when editing
+            required={!location.search.includes('edit')} 
           />
         </p>
 
