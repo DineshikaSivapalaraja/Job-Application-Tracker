@@ -68,6 +68,10 @@ export default function Profile() {
         navigate('/edit-profile')
     }
 
+    const handleAdminDashboard = () => {
+        navigate('/admin');
+    };  //navigate admin dashboard
+
     return(
         <>
         <div>
@@ -81,6 +85,11 @@ export default function Profile() {
             <label>Job: {user.job}</label><br />
             <label>CV: {user.cv}</label><br /> */}
             <button onClick={handleEditProfile}>Edit Profile</button>
+            <br />
+            {user.role === 'admin' && (
+                <button onClick={handleAdminDashboard}>Admin Dashboard</button>
+            )}
+
             </>
         )}
         {user && user.role === 'applicant' && (
