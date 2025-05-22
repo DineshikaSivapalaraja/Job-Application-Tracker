@@ -4,29 +4,39 @@ import { useNavigate } from 'react-router-dom';
 export default function Profile() {
     const [user, setUser] = useState(null);
     const [applications, setApplications] = useState([]);
+    const [error, setError] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
     const fetchData = async () => {
         const token = localStorage.getItem('token');
         if (!token) {
-        navigate('/login');
-        return;
+            navigate('/login');
+            return;
         }
         try {
         const userResponse = await fetch(`http://127.0.0.1:8000/profile`, {
             headers: { Authorization: `Bearer ${token}` },
         });
+        // ##added
+        if (!userResponse.ok) throw new Error('Failed to fetch user data');  
         const userData = await userResponse.json();
         setUser(userData);
 
-        const appResponse = await fetch(`http://127.0.0.1:8000/applications`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        const appData = await appResponse.json();
-        setApplications(appData.applications);
+        //added--> fetch application only for applicants
+        if (userData.role === "applicant") {
+            const appResponse = await fetch(`http://127.0.0.1:8000/applications`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            //added
+            if (!appResponse.ok) throw new Error('Failed to fetch applications');
+            const appData = await appResponse.json();
+            setApplications(appData.applications);
+            } 
         } catch (err) {
             console.error('Error fetching data:', err);
+            //added
+            setError('Failed to load profile. Please try again or log in.');
         }
     };
     fetchData();
@@ -34,58 +44,81 @@ export default function Profile() {
 
     const handleDelete = async (appId) => {
     const token = localStorage.getItem('token');
-    await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-    });
-        setApplications(applications.filter(app => app.id !== appId));
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
+        // await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+            setApplications(applications.filter(app => app.id !== appId));
+        }else {
+            throw new Error('Failed to delete application');
+    } } catch (err) {
+        console.error('Error deleting application: ', err);
+        setError('Failed to delete application');
+    }
     };
 
-    const handleEdit = (appId) => {
+    const handleEditApp = (appId) => {
         navigate(`/application?edit=${appId}`);
     };
+
+    const handleEditProfile = () => {
+        navigate('/edit-profile')
+    }
 
     return(
         <>
         <div>
             <h2>Profile</h2>
-            {/* {/* {/* <label>Name: </label>
-            <label>Email: </label>
-            <label>Mobile: </label>
-            <label>CV: </label>
-            <label>Job: </label> */}
             {user && (
             <>
             <label>Name: {user.name}</label><br />
             <label>Email: {user.email}</label><br />
-            <label>Mobile: {user.mobile}</label><br />
+            <label>Role: {user.role}</label><br />
+            {/* <label>Mobile: {user.mobile}</label><br />
             <label>Job: {user.job}</label><br />
-            <label>CV: {user.cv}</label><br />
+            <label>CV: {user.cv}</label><br /> */}
+            <button onClick={handleEditProfile}>Edit Profile</button>
             </>
         )}
-
+        {user && user.role === 'applicant' && (
+            <>
             <h4>Applications List</h4>
+            {applications.length > 0 ? (
             <table>
                 <tr>
                     <th>Job</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
                     <th>CV</th>
                     <th>Status</th> 
-                     {/* <!--reviewed/downloaded/rejected/shortlisted--> */}
                     <th>Action</th> 
-                    {/* <!-- applicant can delete/edit the application--> */}
                 </tr>
                 {applications.map((app) => (
                 <tr key={app.id}>
                     <td>{app.job}</td>
+                    <td>{app.email}</td>
+                    <td>{app.mobile}</td>
                     <td>{app.cv_path.split('\\').pop()}</td>
                     <td>{app.status}</td>
                     <td>
-                    <button onClick={() => handleEdit(app.id)}>Edit</button>
+                    <button onClick={() => handleEditApp(app.id)}>Edit</button>
                     <button onClick={() => handleDelete(app.id)}>Delete</button>
                     </td>
                 </tr>
                 ))} 
             </table>
+            ) : (
+                <p>
+                    No applications submitted.{' '}
+                    <a href="/application" onClick={() => navigate('/application')}>
+                        Submit an application
+                    </a>
+                </p>
+            ) }
+            </> )}
         </div>
         </>
     );
