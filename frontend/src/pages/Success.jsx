@@ -14,6 +14,7 @@ export default function Success() {
             <p>Application submitted successfully!</p>
             {/* <a href="Profile.jsx">Back to profile</a> */}
             <a href="#" onClick={() => navigate('/profile')}>Back to profile</a>
+            <br />
             <a href="#" onClick={handleLogout}>Logout</a>
             {/* <a href="Logout.jsx">Logout</a> */}
         </div>
