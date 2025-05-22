@@ -116,7 +116,7 @@ class ProfileUpdateForm(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
     password: SecretStr | None = None
-    cpassword: SecretStr | None = None
+    # cpassword: SecretStr | None = None
     
     @validator("password", always=True)
     def validate_password(cls, v: SecretStr | None, values):
@@ -129,12 +129,12 @@ class ProfileUpdateForm(BaseModel):
             raise ValueError("Password must contain at least one letter, one number, and one symbol (@$!%*?&)")
         return v
 
-    @validator("cpassword", always=True)
-    def passwords_match(cls, v: SecretStr | None, values):
-        if "password" in values and values["password"] is not None:
-            if v is None or v.get_secret_value() != values["password"].get_secret_value():
-                raise ValueError("Passwords do not match")
-        return v
+    # @validator("cpassword", always=True)
+    # def passwords_match(cls, v: SecretStr | None, values):
+    #     if "password" in values and values["password"] is not None:
+    #         if v is None or v.get_secret_value() != values["password"].get_secret_value():
+    #             raise ValueError("Passwords do not match")
+    #     return v
     
 #pydantic model for Login form
 class LoginForm(BaseModel):
@@ -448,7 +448,7 @@ async def update_application_status(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
 ###---> (10) Applicant can edit the application  --> working
-@app.put("/applications/{app_id}", response_model=ApplicationResponse)
+@app.put("/edit-applications/{app_id}", response_model=ApplicationResponse)
 async def edit_application(
         app_id: int,
         name: str = Form(...),
