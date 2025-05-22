@@ -32,7 +32,6 @@ export default function ApplicationForm() {
             setEmail(app.email);
             setMobile(app.mobile);
             setJob(app.job);
-            // Note: CV cannot be pre-filled due to browser security restrictions
           } else {
             setError('Application not found');
           }
@@ -69,11 +68,11 @@ export default function ApplicationForm() {
     formData.append('email', email);
     formData.append('mobile', mobile);
     formData.append('job', job);
-    if (cv) formData.append('file', cv);
+    if (cv) formData.append('cv', cv);
 
     try {
       const url = isEditing
-        ? `http://127.0.0.1:8000/applications/${appId}`
+        ? `http://127.0.0.1:8000/edit-applications/${appId}`
         : 'http://127.0.0.1:8000/application-submit';
       const method = isEditing ? 'PUT' : 'POST';
 
@@ -86,7 +85,7 @@ export default function ApplicationForm() {
       });
 
       if (response.ok) {
-        navigate('/success');
+        navigate('/profile');
       } else {
         const data = await response.json();
         setError(data.detail || `Submission failed (Status: ${response.status})`);
@@ -141,7 +140,7 @@ export default function ApplicationForm() {
           <input
             type="file"
             accept=".pdf"
-            name="file"
+            name="cv"
             onChange={(e) => setCv(e.target.files[0])}
             required={!location.search.includes('edit')} // Not required when editing
           />
@@ -159,16 +158,16 @@ export default function ApplicationForm() {
             <option value="none" disabled>
               Select a job
             </option>
-            <option value="se-intern">Software Engineer Intern</option>
-            <option value="associate-se">Associate/Junior Software Engineer</option>
-            <option value="se">Software Engineer</option>
-            <option value="ai/ml-intern">AI/ML Intern</option>
-            <option value="associate-ai/ml">Associate/Junior AI/ML</option>
-            <option value="ml">ML Engineer</option>
-            <option value="ai">AI Engineer</option>
-            <option value="ds">Data Scientist</option>
-            <option value="devops">DevOps Engineer</option>
-            <option value="ui-ux">UI-UX Engineer</option>
+            <option value="Software Engineer Intern">Software Engineer Intern</option>
+            <option value="Associate/Junior Software Engineer">Associate/Junior Software Engineer</option>
+            <option value="Software Engineer">Software Engineer</option>
+            <option value="AI/ML Intern">AI/ML Intern</option>
+            <option value="Associate/Junior AI/ML">Associate/Junior AI/ML</option>
+            <option value="ML Engineer">ML Engineer</option>
+            <option value="AI Engineer">AI Engineer</option>
+            <option value="Data Scientist">Data Scientist</option>
+            <option value="DevOps Engineer">DevOps Engineer</option>
+            <option value="UI-UX Engineer">UI-UX Engineer</option>
           </select>
         </p>
 
