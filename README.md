@@ -1,6 +1,17 @@
 # Job-Application-Tracker
 
 # 💼 Job Application Tracker - Backend
+Welcome! This is the backend of the Job Application Tracker project, built with FastAPI.
+This section will walk you through how to set everything up and get the backend running locally.
+
+⚙️ What You’ll Need
+Before you get started, make sure you have:
+
+Python 3.12 or newer(I used 3.13)
+
+pip for installing packages
+
+A virtual environment to keep things clean
 
 ## 📦 Setting Things Up
 
