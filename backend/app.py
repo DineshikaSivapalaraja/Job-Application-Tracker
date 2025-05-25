@@ -21,13 +21,13 @@ blacklisted_tokens = set()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  #["*"]
+    allow_origins=["*"],  #["http://localhost:5173"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-#database configuration   
+# Database configuration
 db_config = {
     "host": "localhost",
     "user": "root",
@@ -36,21 +36,21 @@ db_config = {
     "charset": "utf8mb4"
 }
 
-#local storage for pdf
+# Local storage for PDFs
 PDF_DIR = "D:\\job-tracker-resumes"
 os.makedirs(PDF_DIR, exist_ok=True)
 
-#database connection
+# Database connection
 def get_db():
     conn = pymysql.connect(**db_config)
     try:
         yield conn
     finally:
         conn.close()
-        
-#JWT settings
+
+# JWT settings
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY")  #secure secret key
+SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not define in the .env file.")
 ADMIN_CODE = os.getenv("ADMIN_CODE")
@@ -59,11 +59,22 @@ if not ADMIN_CODE:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-#password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")        
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-#OAuth2 scheme for JWT
+# OAuth2 scheme for JWT
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# to extract original email
+def extract_original_email(stored_email: str) -> str:
+    local, domain = stored_email.rsplit('@', 1)
+    if '+' in local:
+        local = local.split('+')[0]
+    return f"{local}@{domain}"
 
 # Test the db connection
 @app.get("/test-db")
@@ -76,10 +87,11 @@ async def test_db(db: pymysql.connections.Connection = Depends(get_db)):
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
+# Pydantic models
 # Pydantic model for Signup form 
 class UserDataForm(BaseModel):
     name: str
-    email: EmailStr #built in Pydantic type for email validation
+    email: EmailStr
     password: SecretStr
     cpassword: SecretStr
     
@@ -90,7 +102,7 @@ class UserDataForm(BaseModel):
             raise ValueError("Password must be at least 8 characters long")
         if not re.match(r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]+$", password):
             raise ValueError(
-                "Password must contain at least one letter, one number, and one symbol (@$!%*?&)"
+                "Password must contain at least one letter, one number, and one symbol (@$!%*?&#)"
             )
         return v
 
@@ -99,7 +111,7 @@ class UserDataForm(BaseModel):
         if "password" in values and v.get_secret_value() != values["password"].get_secret_value():
             raise ValueError("Passwords do not match")
         return v
-    
+
 #pydantic model for admin signup form
 class AdminSignupForm(UserDataForm):
     admin_code: str
@@ -116,7 +128,6 @@ class ProfileUpdateForm(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
     password: SecretStr | None = None
-    # cpassword: SecretStr | None = None
     
     @validator("password", always=True)
     def validate_password(cls, v: SecretStr | None, values):
@@ -126,21 +137,14 @@ class ProfileUpdateForm(BaseModel):
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long")
         if not re.match(r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]+$", password):
-            raise ValueError("Password must contain at least one letter, one number, and one symbol (@$!%*?&)")
+            raise ValueError("Password must contain at least one letter, one number, and one symbol (@$!%*?&#)")
         return v
 
-    # @validator("cpassword", always=True)
-    # def passwords_match(cls, v: SecretStr | None, values):
-    #     if "password" in values and values["password"] is not None:
-    #         if v is None or v.get_secret_value() != values["password"].get_secret_value():
-    #             raise ValueError("Passwords do not match")
-    #     return v
-    
 #pydantic model for Login form
 class LoginForm(BaseModel):
     email: EmailStr
     password: SecretStr
-    
+
 #pydantic model for Application form
 class ApplicationForm(BaseModel):
     name: str
@@ -165,11 +169,11 @@ class ApplicationResponse(BaseModel):
     cv_path: str
     job: str
     status: str
-    
+
 #pydantic model for Application list response
 class ApplicationListResponse(BaseModel):
     applications: list[ApplicationResponse]
-    
+
 #pydantic model for application status
 class UpdateApplicationStatus(BaseModel):
     status: str
@@ -180,7 +184,7 @@ class UpdateApplicationStatus(BaseModel):
         if v not in valid_statuses:
             raise ValueError(f"Status must be one of {valid_statuses}")
         return v
-    
+
 #pydantic model for Application edit form
 class ApplicationEditForm(BaseModel):
     name: str
@@ -194,7 +198,7 @@ class ApplicationEditForm(BaseModel):
             raise ValueError("Mobile must be a valid phone number (e.g., +9478709709)")
         return v
 
-#JWT authentication
+# JWT authentication
 def create_access_token(user_id: int, role: str):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode = {
@@ -208,7 +212,7 @@ def create_access_token(user_id: int, role: str):
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("auth")
-
+    
     if token in blacklisted_tokens:
         logger.warning("Token is blacklisted")
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -231,14 +235,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.InvalidTokenError as e:
         logger.error(f"Invalid token: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
-    
+
 async def get_current_admin(token: str = Depends(oauth2_scheme)):
     user = await get_current_user(token)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
-# endpoints to ensure the authentication
+# api endpoints 
 ###---> (1)handling Signup form  --> working
 @app.post("/signup", response_model=UserResponse)
 async def signup(data: UserDataForm, db: pymysql.connections.Connection = Depends(get_db)):
@@ -279,7 +283,7 @@ async def admin_signup(data: AdminSignupForm, db: pymysql.connections.Connection
         raise HTTPException(status_code=400, detail="Email already exists")
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
 ###---> (2)handling Login form --endpoints to ensure the authentication--> working for admin/applicant  
 @app.post("/login")
 async def login(data: LoginForm, db: pymysql.connections.Connection = Depends(get_db)):
@@ -310,10 +314,12 @@ async def login(data: LoginForm, db: pymysql.connections.Connection = Depends(ge
 @app.options("/application-submit")
 async def options_application_submit():
     return Response(status_code=200, headers={
-        "Access-Control-Allow-Origin": "http://localhost:5173",
+        # "Access-Control-Allow-Origin": "http://localhost:5173",
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST",
         "Access-Control-Allow-Headers": "Authorization, Content-Type"
     })
+
 ###---> (3)handling Application form -->working
 @app.post("/application-submit", response_model=ApplicationResponse)
 async def submit_application(
@@ -325,11 +331,22 @@ async def submit_application(
     current_user: dict = Depends(get_current_user),
     db: pymysql.connections.Connection = Depends(get_db)
 ):
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.info(f"Received token: {current_user}")
-    logger.info(f"Received form data: name={name}, email={email}, mobile={mobile}, job={job}")
-    logger.info(f"File: {file.filename}, Content-Type: {file.content_type}")
+    logger.info(f"Received submission: name={name}, email={email}, mobile={mobile}, job={job}, file={file.filename}")
+
+    # verify email matches profile
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "SELECT email FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            user = cursor.fetchone()
+            if not user or user[0] != email:
+                logger.error(f"Submitted email {email} does not match user profile email")
+                raise HTTPException(status_code=400, detail="Submitted email must match your profile email")
+    except pymysql.MySQLError as e:
+        logger.error(f"Database error checking user email: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     try:
         form_data = ApplicationForm(name=name, email=email, mobile=mobile, job=job)
@@ -341,10 +358,28 @@ async def submit_application(
         logger.error("Non-PDF file uploaded")
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
+    # check for existing application with same email and job
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM applications WHERE email = %s AND job = %s",
+                (email, job)
+            )
+            if cursor.fetchone():
+                logger.warning(f"Duplicate application for email={email}, job={job}")
+                raise HTTPException(status_code=400, detail="You have already applied for this job with this email.")
+    except pymysql.MySQLError as e:
+        logger.error(f"Database error checking duplicate: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
     unique_filename = f"{uuid.uuid4()}.pdf"
     file_path = os.path.join(PDF_DIR, unique_filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"File save error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save CV: {str(e)}")
 
     try:
         with db.cursor() as cursor:
@@ -356,22 +391,27 @@ async def submit_application(
             cursor.execute("SELECT LAST_INSERT_ID()")
             app_id = cursor.fetchone()[0]
 
-        return ApplicationResponse(
-            id=app_id,
-            user_id=current_user["user_id"],
-            name=form_data.name,
-            email=form_data.email,
-            mobile=form_data.mobile,
-            cv_path=file_path,
-            job=form_data.job,
-            status="Applied"
-        )
+            cursor.execute(
+                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            app = cursor.fetchone()
+            return ApplicationResponse(
+                id=app[0],
+                user_id=app[1],
+                name=app[2],
+                email=app[3],  # use original/registered email directly
+                mobile=app[4],
+                cv_path=app[5],
+                job=app[6],
+                status=app[7]
+            )
     except pymysql.MySQLError as e:
-        logger.error(f"Database error: {e}")
+        logger.error(f"Database error during insertion: {e}")
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
 ###---> (4)listing the applications(applicant can view their own applications) --> working
 @app.get("/applications", response_model=ApplicationListResponse)
 async def get_applications(current_user: dict = Depends(get_current_user), db: pymysql.connections.Connection = Depends(get_db)):
@@ -384,6 +424,9 @@ async def get_applications(current_user: dict = Depends(get_current_user), db: p
             applications = cursor.fetchall()
             if not applications:
                 raise HTTPException(status_code=404, detail="No applications found")
+            # convert stored email to original email
+            for app in applications:
+                app["email"] = extract_original_email(app["email"])
             return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -399,6 +442,9 @@ async def get_all_applications(current_user: dict = Depends(get_current_admin), 
             applications = cursor.fetchall()
             if not applications:
                 raise HTTPException(status_code=404, detail="No applications found")
+            # convert stored email to original email
+            for app in applications:
+                app["email"] = extract_original_email(app["email"])
             return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -438,7 +484,7 @@ async def update_application_status(
                 id=updated_app[0],
                 user_id=updated_app[1],
                 name=updated_app[2],
-                email=updated_app[3],
+                email=extract_original_email(updated_app[3]),
                 mobile=updated_app[4],
                 cv_path=updated_app[5],
                 job=updated_app[6],
@@ -446,62 +492,83 @@ async def update_application_status(
             )
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
 ###---> (10) Applicant can edit the application  --> working
 @app.put("/edit-applications/{app_id}", response_model=ApplicationResponse)
 async def edit_application(
-        app_id: int,
-        name: str = Form(...),
-        email: EmailStr = Form(...),
-        mobile: str = Form(...),
-        job: str = Form(...),
-        cv: UploadFile = File(None),
-        current_user: dict = Depends(get_current_user),
-        db: pymysql.connections.Connection = Depends(get_db)
-    ):
-    
+    app_id: int,
+    name: str = Form(...),
+    email: EmailStr = Form(...),
+    mobile: str = Form(...),
+    job: str = Form(...),
+    file: UploadFile = File(...),  # CV is required
+    current_user: dict = Depends(get_current_user),
+    db: pymysql.connections.Connection = Depends(get_db)
+):
+    logger.info(f"Editing application {app_id}: name={name}, email={email}, mobile={mobile}, job={job}, file={file.filename}")
     try:
         form_data = ApplicationEditForm(name=name, email=email, mobile=mobile, job=job)
     except ValueError as e:
+        logger.error(f"Form validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+    if file.content_type != "application/pdf":
+        logger.error("Non-PDF file uploaded")
+        raise HTTPException(status_code=400, detail="CV must be a PDF")
 
     try:
         with db.cursor() as cursor:
             cursor.execute(
-                "SELECT user_id, status, cv_path FROM applications WHERE id = %s",
+                "SELECT user_id, status, cv_path, email FROM applications WHERE id = %s",
                 (app_id,)
             )
             application = cursor.fetchone()
             if not application:
+                logger.error(f"Application {app_id} not found")
                 raise HTTPException(status_code=404, detail="Application not found")
             if current_user["user_id"] != application[0]:
+                logger.error(f"User {current_user['user_id']} not authorized to edit application {app_id}")
                 raise HTTPException(status_code=403, detail="Not authorized to edit this application")
             if application[1] != "Applied":
+                logger.error(f"Application {app_id} status is {application[1]}, cannot edit")
                 raise HTTPException(status_code=400, detail="Can only edit applications with status 'Applied'")
 
-            new_cv_path = application[2]  
-            if cv:
-                if cv.content_type != "application/pdf":
-                    raise HTTPException(status_code=400, detail="CV must be a PDF")
+            # check for duplicate application with same email and job (excluding current app)
+            cursor.execute(
+                "SELECT id FROM applications WHERE email LIKE %s AND job = %s AND id != %s",
+                (f"{email.split('@')[0]}%@%", job, app_id)
+            )
+            if cursor.fetchone():
+                logger.warning(f"Duplicate application for email={email}, job={job}")
+                raise HTTPException(status_code=400, detail="You have already applied for this job with this email.")
 
-                # Delete the old CV file
-                old_cv_path = application[2]
-                if os.path.exists(old_cv_path):
-                    os.remove(old_cv_path)
+            # reuse email from existing application
+            stored_email = application[3]  # keep the same email 
+            logger.info(f"Reusing email {stored_email} for application {app_id}")
 
-                # Generate new filename and save the new CV
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                unique_id = str(uuid.uuid4())[:8]
-                cv_name = f"{timestamp}_{unique_id}.pdf"
-                new_cv_path = os.path.join(PDF_DIR, cv_name)
+            # Delete the old CV file
+            old_cv_path = application[2]
+            if os.path.exists(old_cv_path):
+                os.remove(old_cv_path)
+
+            # Save the new CV
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            cv_name = f"{timestamp}_{unique_id}.pdf"
+            new_cv_path = os.path.join(PDF_DIR, cv_name)
+            try:
                 with open(new_cv_path, "wb") as f:
-                    shutil.copyfileobj(cv.file, f)
+                    shutil.copyfileobj(file.file, f)
+            except Exception as e:
+                logger.error(f"File save error: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to save CV: {str(e)}")
 
             cursor.execute(
                 "UPDATE applications SET name = %s, email = %s, mobile = %s, job = %s, cv_path = %s WHERE id = %s",
-                (form_data.name, form_data.email, form_data.mobile, form_data.job, new_cv_path, app_id)
+                (form_data.name, stored_email, form_data.mobile, form_data.job, new_cv_path, app_id)
             )
             if cursor.rowcount == 0:
+                logger.error(f"Failed to update application {app_id}")
                 raise HTTPException(status_code=500, detail="Failed to update application")
             db.commit()
 
@@ -514,20 +581,22 @@ async def edit_application(
                 id=updated_app[0],
                 user_id=updated_app[1],
                 name=updated_app[2],
-                email=updated_app[3],
+                email=extract_original_email(updated_app[3]),
                 mobile=updated_app[4],
                 cv_path=updated_app[5],
                 job=updated_app[6],
                 status=updated_app[7]
             )
     except pymysql.MySQLError as e:
+        logger.error(f"Database error: {e}")
         # clean up new CV file if database update fails
-        if cv and 'new_cv_path' in locals() and os.path.exists(new_cv_path):
+        if 'new_cv_path' in locals() and os.path.exists(new_cv_path):
             os.remove(new_cv_path)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except OSError as e:
+        logger.error(f"File handling error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to handle CV file: {str(e)}")
-    
+
 ###---> (8)delete application --> working with admin access
 @app.delete("/applications/{app_id}")
 async def delete_application(
@@ -553,7 +622,7 @@ async def delete_application(
             cv_path = application[1]
             if os.path.exists(cv_path):
                 os.remove(cv_path)
-
+            
             # delete the application from the database
             cursor.execute(
                 "DELETE FROM applications WHERE id = %s",
@@ -566,7 +635,7 @@ async def delete_application(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete CV file: {str(e)}")
-    
+
 ###---> (9) Download CV--> working with admin access
 @app.get("/applications/{app_id}/cv")
 async def download_cv(
@@ -678,9 +747,10 @@ async def update_profile(
         raise HTTPException(status_code=400, detail="Email already exists")
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
 ###---> (13) Logout --> working
 @app.post("/logout")
 async def logout(token: str = Depends(oauth2_scheme)):
     blacklisted_tokens.add(token)
     return JSONResponse(status_code=200, content={"message": "Successfully logged out"})
+
