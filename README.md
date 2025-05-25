@@ -1,24 +1,78 @@
 # Job-Application-Tracker
 
-Backend(installed packages)
+# 💼 Job Application Tracker - Backend
+Welcome! This is the backend of the Job Application Tracker project, built with FastAPI.
+This section will walk you through how to set everything up and get the backend running locally.
 
-pip install fastapi[all] or pip install fastapi & pip install uvicorn
+⚙️ What You’ll Need
+Before you get started, make sure you have:
 
-to run the backend --> (1)uvicorn app:app --reload
+Python 3.12 or newer(I used 3.13)
 
-            --> (2)uvicorn app:app --reload --port 8005(for different port to get backend)
+pip for installing packages
 
-pip install pydantic
+A virtual environment to keep things clean
 
-venv\Scripts\activate--> virtual environment used before to install some packages
+## 📦 Setting Things Up
 
-pip install fastapi uvicorn pymysql
+### 1. Use a Virtual Environment (Recommended)
 
-pip install fastapi uvicorn pymysql passlib[bcrypt] pyjwt
+It's a good idea to use a virtual environment so your project dependencies don't interfere with other Python projects on your system.
 
-pip install python-dotenv
+```bash
+python -m venv venv
+.venv\Scripts\activate  # On Windows
+```
 
-python generate_key.py --> to get the secret key
+### 2. Install the Required Packages
 
-pip freeze > requirements.txt or pip install -r requirements.txt -->to get list of python dependencies
+```bash
+pip install fastapi uvicorn pymysql passlib[bcrypt] pyjwt python-dotenv
+```
+
+---
+
+## 🔑 Generating a Secret Key
+
+I use a secret key for handling JWTs (JSON Web Tokens). To generate one, just run:
+
+```bash
+python generate_key.py
+```
+
+---
+
+## 🚀 Running the Backend
+
+Once everything’s set up, you can start the development server with:
+
+```bash
+uvicorn app:app --reload
+```
+
+If you want to run it on a different port (say, 8005), use:
+
+```bash
+uvicorn app:app --reload --port 8005
+```
+
+The `--reload` flag makes the server automatically restart when you make changes — useful for development.
+
+---
+
+## 📋 Managing Dependencies
+
+To save your installed dependencies:
+
+```bash
+pip freeze > requirements.txt
+```
+
+And if you're setting up the project on a new machine later:
+
+```bash
+pip install -r requirements.txt
+```
+
+
 
