@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel, SecretStr, EmailStr, validator
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Query
 import re
 import pymysql
 from fastapi.security import OAuth2PasswordBearer
@@ -372,11 +373,15 @@ async def submit_application(
         logger.error(f"Database error checking duplicate: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    unique_filename = f"{uuid.uuid4()}.pdf"
-    file_path = os.path.join(PDF_DIR, unique_filename)
+    # save the new CV
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = str(uuid.uuid4())[:8]
+    cv_name = f"{timestamp}_{unique_id}.pdf"
+    file_path = os.path.join(PDF_DIR, cv_name)
+    
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
     except Exception as e:
         logger.error(f"File save error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save CV: {str(e)}")
@@ -414,20 +419,36 @@ async def submit_application(
 
 ###---> (4)listing the applications(applicant can view their own applications) --> working
 @app.get("/applications", response_model=ApplicationListResponse)
-async def get_applications(current_user: dict = Depends(get_current_user), db: pymysql.connections.Connection = Depends(get_db)):
+async def get_applications(
+    app_id: int | None = Query(None, description="Optional application ID to fetch a single application"),
+    current_user: dict = Depends(get_current_user),
+    db: pymysql.connections.Connection = Depends(get_db)
+):
     try:
         with db.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute(
-                "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE user_id = %s",
-                (current_user["user_id"],)
-            )
-            applications = cursor.fetchall()
-            if not applications:
-                raise HTTPException(status_code=404, detail="No applications found")
-            # convert stored email to original email
-            for app in applications:
-                app["email"] = extract_original_email(app["email"])
-            return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
+            if app_id:
+                # fetch a single application
+                cursor.execute(
+                    "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE user_id = %s AND id = %s",
+                    (current_user["user_id"], app_id)
+                )
+                application = cursor.fetchone()
+                if not application:
+                    raise HTTPException(status_code=404, detail="Application not found or not authorized")
+                application["email"] = extract_original_email(application["email"])
+                return ApplicationListResponse(applications=[ApplicationResponse(**application)])
+            else:
+                # fetch all applications
+                cursor.execute(
+                    "SELECT id, user_id, name, email, mobile, cv_path, job, status FROM applications WHERE user_id = %s",
+                    (current_user["user_id"],)
+                )
+                applications = cursor.fetchall()
+                if not applications:
+                    raise HTTPException(status_code=404, detail="No applications found")
+                for app in applications:
+                    app["email"] = extract_original_email(app["email"])
+                return ApplicationListResponse(applications=[ApplicationResponse(**app) for app in applications])
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -497,29 +518,20 @@ async def update_application_status(
 @app.put("/edit-applications/{app_id}", response_model=ApplicationResponse)
 async def edit_application(
     app_id: int,
-    name: str = Form(...),
-    email: EmailStr = Form(...),
-    mobile: str = Form(...),
-    job: str = Form(...),
-    file: UploadFile = File(...),  # CV is required
+    name: str | None = Form(None),
+    email: EmailStr | None = Form(None),
+    mobile: str | None = Form(None),
+    job: str | None = Form(None),
+    file: UploadFile | None = File(None),  
     current_user: dict = Depends(get_current_user),
     db: pymysql.connections.Connection = Depends(get_db)
 ):
-    logger.info(f"Editing application {app_id}: name={name}, email={email}, mobile={mobile}, job={job}, file={file.filename}")
-    try:
-        form_data = ApplicationEditForm(name=name, email=email, mobile=mobile, job=job)
-    except ValueError as e:
-        logger.error(f"Form validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-    if file.content_type != "application/pdf":
-        logger.error("Non-PDF file uploaded")
-        raise HTTPException(status_code=400, detail="CV must be a PDF")
-
+    logger.info(f"Editing application {app_id}: name={name}, email={email}, mobile={mobile}, job={job}, file={file.filename if file else None}")
+    
     try:
         with db.cursor() as cursor:
             cursor.execute(
-                "SELECT user_id, status, cv_path, email FROM applications WHERE id = %s",
+                "SELECT user_id, status, cv_path, email, name, mobile, job FROM applications WHERE id = %s",
                 (app_id,)
             )
             application = cursor.fetchone()
@@ -533,39 +545,62 @@ async def edit_application(
                 logger.error(f"Application {app_id} status is {application[1]}, cannot edit")
                 raise HTTPException(status_code=400, detail="Can only edit applications with status 'Applied'")
 
-            # check for duplicate application with same email and job (excluding current app)
-            cursor.execute(
-                "SELECT id FROM applications WHERE email LIKE %s AND job = %s AND id != %s",
-                (f"{email.split('@')[0]}%@%", job, app_id)
-            )
-            if cursor.fetchone():
-                logger.warning(f"Duplicate application for email={email}, job={job}")
-                raise HTTPException(status_code=400, detail="You have already applied for this job with this email.")
+            # use existing values if form fields are not provided
+            new_name = name if name is not None else application[4]
+            new_email = application[3]  
+            new_mobile = mobile if mobile is not None else application[5]
+            new_job = job if job is not None else application[6]
+            new_cv_path = application[2]  
 
-            # reuse email from existing application
-            stored_email = application[3]  # keep the same email 
-            logger.info(f"Reusing email {stored_email} for application {app_id}")
+            # validate form data only if provided
+            if name or email or mobile or job:
+                try:
+                    form_data = ApplicationEditForm(
+                        name=name, 
+                        email=email or new_email,
+                        mobile=mobile, 
+                        job=job
+                    )
+                except ValueError as e:
+                    logger.error(f"Form validation error: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
-            # Delete the old CV file
-            old_cv_path = application[2]
-            if os.path.exists(old_cv_path):
-                os.remove(old_cv_path)
+            #duplicate application check
+            if job:
+                cursor.execute(
+                    "SELECT id FROM applications WHERE email LIKE %s AND job = %s AND id != %s",
+                    (f"{(email or new_email).split('@')[0]}%@%", job, app_id)
+                )
+                if cursor.fetchone():
+                    logger.warning(f"Duplicate application for email={email or new_email}, job={job}")
+                    raise HTTPException(status_code=400, detail="You have already applied for this job with this email.")
 
-            # Save the new CV
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_id = str(uuid.uuid4())[:8]
-            cv_name = f"{timestamp}_{unique_id}.pdf"
-            new_cv_path = os.path.join(PDF_DIR, cv_name)
-            try:
-                with open(new_cv_path, "wb") as f:
-                    shutil.copyfileobj(file.file, f)
-            except Exception as e:
-                logger.error(f"File save error: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to save CV: {str(e)}")
+            if file:
+                if file.content_type != "application/pdf":
+                    logger.error("Non-PDF file uploaded")
+                    raise HTTPException(status_code=400, detail="CV must be a PDF")
+                
+                # delete the old CV file
+                old_cv_path = application[2]
+                if os.path.exists(old_cv_path):
+                    os.remove(old_cv_path)
+                    
+                # save the new CV
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                unique_id = str(uuid.uuid4())[:8]
+                cv_name = f"{timestamp}_{unique_id}.pdf"
+                new_cv_path = os.path.join(PDF_DIR, cv_name)
+                try:
+                    with open(new_cv_path, "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                except Exception as e:
+                    logger.error(f"File save error: {e}")
+                    raise HTTPException(status_code=500, detail=f"Failed to save CV: {str(e)}")
 
+            # update the application
             cursor.execute(
                 "UPDATE applications SET name = %s, email = %s, mobile = %s, job = %s, cv_path = %s WHERE id = %s",
-                (form_data.name, stored_email, form_data.mobile, form_data.job, new_cv_path, app_id)
+                (new_name, new_email, new_mobile, new_job, new_cv_path, app_id)
             )
             if cursor.rowcount == 0:
                 logger.error(f"Failed to update application {app_id}")
@@ -589,7 +624,6 @@ async def edit_application(
             )
     except pymysql.MySQLError as e:
         logger.error(f"Database error: {e}")
-        # clean up new CV file if database update fails
         if 'new_cv_path' in locals() and os.path.exists(new_cv_path):
             os.remove(new_cv_path)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
