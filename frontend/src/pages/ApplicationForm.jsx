@@ -7,10 +7,37 @@ export default function ApplicationForm() {
   const [mobile, setMobile] = useState('');
   const [job, setJob] = useState('none');
   const [cv, setCv] = useState(null);
+  const [existingCv, setExistingCv] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
+  // fetch user profile to get registered email
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+      try {
+        const response = await fetch('http://127.0.0.1:8000/profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        const data = await response.json();
+        setEmail(data.email); // set registered email in application form
+      } catch (err) {
+        console.error('Fetch profile error:', err);
+        setError('Failed to load profile data. Please try again.');
+      }
+    };
+    fetchProfile();
+  }, [navigate]);
+
+  // fetch application data for edit
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const appId = params.get('edit');
@@ -22,21 +49,22 @@ export default function ApplicationForm() {
           return;
         }
         try {
+          // const response = await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
           const response = await fetch(`http://127.0.0.1:8000/applications`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          const data = await response.json();
-          const app = data.applications.find((a) => a.id === parseInt(appId));
-          if (app) {
-            setName(app.name);
-            setEmail(app.email);
-            setMobile(app.mobile);
-            setJob(app.job);
-          } else {
-            setError('Application not found');
+          if (!response.ok) {
+            throw new Error(`Failed to fetch application (Status: ${response.status})`);
           }
+          const data = await response.json();
+          setName(data.name);
+          setEmail(data.email);
+          setMobile(data.mobile);
+          setJob(data.job);
+          setExistingCv(data.cv_path.split('\\').pop());
         } catch (err) {
-          setError('Error fetching application data');
+          console.error('Fetch application error:', err);
+          setError('Error fetching application data. Ensure the application exists.');
         }
       };
       fetchApplication();
@@ -54,8 +82,8 @@ export default function ApplicationForm() {
       return;
     }
 
-    if (!name || !email || !mobile || job === 'none') {
-      setError('Please fill all required fields and select a job');
+    if (!name || !email || !mobile || job === 'none' || (!cv && !existingCv)) {
+      setError('Please fill all required fields, select a job, and upload a CV');
       return;
     }
 
@@ -68,7 +96,11 @@ export default function ApplicationForm() {
     formData.append('email', email);
     formData.append('mobile', mobile);
     formData.append('job', job);
-    if (cv) formData.append('cv', cv);
+    if (cv) {
+      formData.append('file', cv);
+    }
+
+    console.log('FormData:', Object.fromEntries(formData));
 
     try {
       const url = isEditing
@@ -84,19 +116,23 @@ export default function ApplicationForm() {
         body: formData,
       });
 
+      console.log('Response status:', response.status, 'Response ok:', response.ok, 'Headers:', response.headers);
+
       if (response.ok) {
         navigate('/profile');
       } else {
         const data = await response.json();
+        console.log('Error response:', data);
         setError(data.detail || `Submission failed (Status: ${response.status})`);
       }
     } catch (err) {
+      console.error('Network error:', err);
       setError('Network error occurred. Please try again.');
-      console.error('Fetch error:', err);
     }
   };
 
   return (
+    <>
     <div>
       <form className="form-box" onSubmit={handleSubmit}>
         <h2>{location.search.includes('edit') ? 'Edit Application' : 'Application Form'}</h2>
@@ -119,7 +155,7 @@ export default function ApplicationForm() {
             type="email"
             name="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            readOnly
             required
           />
         </p>
@@ -137,12 +173,13 @@ export default function ApplicationForm() {
 
         <p>
           <label htmlFor="file">CV (PDF only):</label>
+          {existingCv && <span>Current: {existingCv}</span>}
           <input
             type="file"
             accept=".pdf"
             name="cv"
             onChange={(e) => setCv(e.target.files[0])}
-            required={!location.search.includes('edit')} 
+            required={!existingCv}
           />
         </p>
 
@@ -174,5 +211,6 @@ export default function ApplicationForm() {
         <button type="submit">{location.search.includes('edit') ? 'Update' : 'Submit'}</button>
       </form>
     </div>
+    </>
   );
 }
