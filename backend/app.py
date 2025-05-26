@@ -10,6 +10,7 @@ from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 import shutil
 import uuid
@@ -28,18 +29,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+load_dotenv()
+
 # Database configuration
+# db_config = {"host": "localhost", "user": "root","password": "","database": "job_tracker","charset": "utf8mb4" }
 db_config = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",
-    "database": "job_tracker",
-    "charset": "utf8mb4"
+    "host": os.getenv("DB_HOST", "localhost"),  # default to localhost for dev
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME"),
+    "charset": os.getenv("DB_CHARSET", "utf8mb4")  # default
 }
 
-# Local storage for PDFs
-PDF_DIR = "D:\\job-tracker-resumes"
-os.makedirs(PDF_DIR, exist_ok=True)
+# # Local storage for PDFs
+# PDF_DIR = "D:\\job-tracker-resumes" # os.makedirs(PDF_DIR, exist_ok=True)
+
+PDF_DIR = Path(os.getenv("PDF_DIR")) #store cv
+if not PDF_DIR:
+    raise ValueError("PDF_DIR environment variable is not defined in the .env file.")
+PDF_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database connection
 def get_db():
@@ -50,7 +58,7 @@ def get_db():
         conn.close()
 
 # JWT settings
-load_dotenv()
+# load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not define in the .env file.")
@@ -58,7 +66,9 @@ ADMIN_CODE = os.getenv("ADMIN_CODE")
 if not ADMIN_CODE:
     raise ValueError("ADMIN_CODE environment variable is not define in the .env file.")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)) ###
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
