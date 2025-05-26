@@ -30,7 +30,7 @@ export default function LogIn() {
 
     return(
         <>
-        <div>
+        <div className='form-wrapper'>
         <form className="form-box" onSubmit={handleSubmit}>
             <h2> Log In </h2>
             {error && <p style={{ color: 'red' }}>{error}</p>}

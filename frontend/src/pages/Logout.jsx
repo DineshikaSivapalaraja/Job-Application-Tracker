@@ -19,5 +19,8 @@ export default function Logout() {
     logout();
   }, [navigate]);
 
-  return null; 
+  // return null; 
+  return (
+    <h2>Successfully Logout!</h2>
+  );
 }

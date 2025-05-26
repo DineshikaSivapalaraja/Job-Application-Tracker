@@ -74,9 +74,11 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div >
+        <>
+        <div className='form-box2'>
         <h2>Applicants List</h2>
-        <table>
+        <div className='table-container'>
+        <table className='admin-dashboard'>
             <tr>
             <th>Name</th>
             <th>Email</th>
@@ -114,5 +116,7 @@ export default function AdminDashboard() {
             ))}
         </table>
         </div>
+        </div>
+        </>
     );
 }

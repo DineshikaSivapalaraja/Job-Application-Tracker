@@ -149,7 +149,7 @@ export default function ApplicationForm() {
 
   return (
     <>
-      <div>
+      <div className='form-wrapper'>
         <form className="form-box" onSubmit={handleSubmit}>
           <h2>{isEditing ? 'Edit Application' : 'Application Form'}</h2>
           {error && <p style={{ color: 'red' }}>{error}</p>}

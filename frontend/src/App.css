@@ -1,6 +1,17 @@
 * {
-  background-color: #001329;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
   color: white;
+  background-color: #001329;
+}
+
+.form-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  /* margin-top: 10%; */
 }
 
 .form-box {
@@ -10,19 +21,20 @@
   border: 5px solid #ccc;
   border-radius: 10px;
   color: white;
+  width: 100%;
 }
 
-.form-box h2 {
+.form-box h2, .form-box2 h2{
   text-align: center;
   font-size: 2rem;
 }
 
-.form-box p {
+.form-box, .form-box2 {
   margin: 10px 0;
   font-size: 1.5rem;
 }
 
-.form-box label {
+.form-box label{
   display: block;
   margin-bottom: 5px;
 }
@@ -31,11 +43,9 @@
   width: 100%;
   padding: 8px;
   box-sizing: border-box;
-  color: white;
-  font-size: 1.2rem;
 }
 
-.form-box button {
+.form-box button, .form-box2 button {
   width: 100%;
   padding: 10px;
   background-color: #77818d;
@@ -60,6 +70,43 @@
   text-align: center;
 }
 
-/* .link1 {
-  text-decoration: none;
-} */
+.form-box2, .form-box3{
+  color: white;
+  text-align: center;
+}
+
+.table-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 30px;
+}
+
+.admin-dashboard {
+  border-collapse: collapse;
+  width: 90%;
+  max-width: 1000px;
+  text-align: center;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.admin-dashboard th,
+.admin-dashboard td {
+  border: 1px solid #ccc;
+  padding: 10px 15px;
+}
+
+.admin-dashboard th {
+  background-color: #1a1a22;
+}
+
+.form-box3{
+  text-align: left;
+  border: 5px solid #ccc;
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 20px;
+  border-radius: 10px;
+  color: white;
+  width: 100%;
+} 

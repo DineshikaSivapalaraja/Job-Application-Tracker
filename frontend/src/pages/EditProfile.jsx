@@ -52,7 +52,9 @@ export default function EditProfile() {
     };
 
     return (
-        <div>
+        <>
+        <div className='form-wrapper'>
+        <div className='form-box'>
         <h2>Edit Profile</h2>
         {error && <p style={{ color: 'red' }}>{error}</p>}
         {success && <p style={{ color: 'green' }}>{success}</p>}
@@ -87,5 +89,7 @@ export default function EditProfile() {
             <button type="submit">Save Changes</button>
         </form>
         </div>
+        </div>
+        </>
     );
 }

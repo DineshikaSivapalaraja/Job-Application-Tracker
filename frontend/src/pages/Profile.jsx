@@ -80,31 +80,37 @@ export default function Profile() {
 
     return (
         <>
-        <div>
+        {/* <div> */}
+            <div className='form-box2'>
+            
             <h2>Profile</h2>
             {loading && <p>Loading...</p>}
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {user && (
                 <>
+                <div className='form-box3'>
                 <label>Name: {user.name}</label><br />
                 <label>Email: {user.email}</label><br />
                 <label>Role: {user.role}</label><br />
                 {/* <label>Mobile: {user.mobile}</label><br />
                 <label>Job: {user.job}</label><br />
                 <label>CV: {user.cv}</label><br /> */}
+                <br />
                 <button onClick={handleEditProfile}>Edit Profile</button>
                 <br />
                 {user.role === 'admin' && (
                     <button onClick={handleAdminDashboard}>Admin Dashboard</button>
                 )}
+                </div> 
                 </>
             )}
             {user && user.role === 'applicant' && (
                 <>
-                <h4>Applications List</h4>
+                <h3>Applications List</h3>
                 {applications.length > 0 ? (
                     // <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <table style={{ borderCollapse: 'collapse' }}>
+                    <div className='table-container'>
+                    <table className='admin-dashboard' style={{ borderCollapse: 'collapse' }}>
                     <thead>
                         <tr>
                         <th>Job</th>
@@ -131,6 +137,7 @@ export default function Profile() {
                         ))}
                     </tbody>
                     </table>
+                    </div>
                 ) : (
                     <p>
                         No applications submitted.{' '}
@@ -142,7 +149,7 @@ export default function Profile() {
                 <p>
                     {/* <strong>Note:</strong> You must upload a CV for each new application.{' '} */}
                     <a href="/application" onClick={() => navigate('/application')}>
-                    Apply for another job
+                        Apply for another job
                     </a>
                 </p>
                 </>
