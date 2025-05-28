@@ -24,6 +24,10 @@ The main goal of this app is to:
 * Easy-to-use interface for both users and admins.
 * Real-time status updates.
 
+### Tech Stack
+Backend --> FastAPI(Python)   |   Database --> MySQL   |   Frontend --> React
+
+
 
 
 
