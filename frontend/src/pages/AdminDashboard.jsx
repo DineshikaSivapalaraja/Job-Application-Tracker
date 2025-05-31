@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function AdminDashboard() {
     const [applications, setApplications] = useState([]);
     const [status, setStatus] = useState('');
@@ -10,7 +12,9 @@ export default function AdminDashboard() {
         if (!token) return;
         try {
             // const response = await fetch('http://localhost:8000/admin/applications', {
-            const response = await fetch(`http://127.0.0.1:8000/admin/applications`, {
+            // const response = await fetch(`http://127.0.0.1:8000/admin/applications`, {
+            const response = await fetch(`${API_URL}/admin/applications`, {
+
             headers: { Authorization: `Bearer ${token}` },
             });
             const data = await response.json();
@@ -24,7 +28,7 @@ export default function AdminDashboard() {
 
     const handleStatusUpdate = async (appId) => {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
+        const response = await fetch(`${API_URL}/applications/${appId}`, {
 
         method: 'PUT',
         headers: { 
@@ -53,7 +57,7 @@ export default function AdminDashboard() {
     const handleDownloadCV = async (appId) => {
     const token = localStorage.getItem('token');
     try {
-        const response = await fetch(`http://127.0.0.1:8000/applications/${appId}/cv`, {
+        const response = await fetch(`${API_URL}/applications/${appId}/cv`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) {

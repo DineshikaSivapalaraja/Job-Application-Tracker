@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function ApplicationForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,7 +24,7 @@ export default function ApplicationForm() {
         return;
       }
       try {
-        const response = await fetch('http://127.0.0.1:8000/profile', {
+        const response = await fetch(`${API_URL}/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) {
@@ -50,7 +52,7 @@ export default function ApplicationForm() {
           return;
         }
         try {
-          const response = await fetch(`http://127.0.0.1:8000/applications?app_id=${appId}`, {
+          const response = await fetch(`${API_URL}/applications?app_id=${appId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!response.ok) {
@@ -120,8 +122,8 @@ export default function ApplicationForm() {
       const params = new URLSearchParams(location.search);
       const appId = params.get('edit');
       const url = isEditing
-        ? `http://127.0.0.1:8000/edit-applications/${appId}`
-        : 'http://127.0.0.1:8000/application-submit';
+        ? `${API_URL}/edit-applications/${appId}`
+        : `${API_URL}/application-submit`;
       const method = isEditing ? 'PUT' : 'POST';
 
       const response = await fetch(url, {

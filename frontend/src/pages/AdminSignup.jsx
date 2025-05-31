@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function AdminSignup() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -18,7 +20,7 @@ export default function AdminSignup() {
         return;
         }
         try {
-        const response = await fetch('http://127.0.0.1:8000/admin-signup', {
+        const response = await fetch(`${API_URL}/admin-signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, password, cpassword, admin_code: adminCode }),

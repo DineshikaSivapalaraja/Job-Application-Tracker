@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function EditProfile() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -28,7 +30,7 @@ export default function EditProfile() {
         }
 
         try {
-        const response = await fetch(`http://127.0.0.1:8000/profile`, {
+        const response = await fetch(`${API_URL}/profile`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',

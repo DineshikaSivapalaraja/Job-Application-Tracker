@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Home() {
     const [user, setUser] = useState(null);
 
@@ -9,7 +11,7 @@ export default function Home() {
             const token = localStorage.getItem('token');
             if (!token) return;
             try {
-                const response = await fetch('http://127.0.0.1:8000/profile', {
+                const response = await fetch(`${API_URL}/profile`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (response.ok) {

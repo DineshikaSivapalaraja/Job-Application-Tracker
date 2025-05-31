@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Profile() {
     const [user, setUser] = useState(null);
     const [applications, setApplications] = useState([]);
@@ -16,7 +18,7 @@ export default function Profile() {
             return;
         }
         try {
-            const userResponse = await fetch(`http://127.0.0.1:8000/profile`, {
+            const userResponse = await fetch(`${API_URL}/profile`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             //added
@@ -28,7 +30,7 @@ export default function Profile() {
 
             //added--> fetch application only for applicants
             if (userData.role === 'applicant') {
-            const appResponse = await fetch('http://127.0.0.1:8000/applications', {
+            const appResponse = await fetch(`${API_URL}/applications`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             //added
@@ -51,7 +53,7 @@ export default function Profile() {
     const handleDelete = async (appId) => {
         const token = localStorage.getItem('token');
         try {
-            const response = await fetch(`http://127.0.0.1:8000/applications/${appId}`, {
+            const response = await fetch(`${API_URL}/applications/${appId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
             });
