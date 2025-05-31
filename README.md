@@ -45,8 +45,6 @@ The main goal of this app is to:
 * pip for installing packages
 * A virtual environment to keep things clean
 
-## Setting Things Up
-
 1. **Install dependencies**
     ```bash
     cd backend
@@ -127,9 +125,6 @@ The main goal of this app is to:
 
 **Applicants:**
 - `POST /signup` — Register
-- `POST /login` — Login
-- `GET /profile` — View profile
-- `PUT /profile` — Edit profile
 - `POST /application-submit` — Submit application
 - `GET /applications` — List own applications
 - `PUT /edit-applications/{app_id}` — Edit application
@@ -140,6 +135,12 @@ The main goal of this app is to:
 - `GET /admin/applications` — List all applications
 - `PUT /applications/{app_id}` — Update application status
 - `GET /applications/{app_id}/cv` — Download CV
+
+**Common for both:**
+- `POST /login` — Login
+- `GET /profile` — View profile
+- `PUT /profile` — Edit profile
+- `POST /logout` - Logout
 
 ---
 
