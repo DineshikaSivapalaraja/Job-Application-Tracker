@@ -135,7 +135,10 @@ export default function ApplicationForm() {
       console.log('Response status:', response.status, 'Response ok:', response.ok, 'Headers:', response.headers);
 
       if (response.ok) {
-        navigate('/profile');
+        // navigate('/profile');
+        navigate('/success', {
+          state: { message: isEditing ? 'Application updated successfully!' : 'Application submitted successfully!' }
+        });
       } else {
           const data = await response.json();
           console.log('Error response:', data);

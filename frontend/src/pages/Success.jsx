@@ -1,22 +1,22 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Success() {
     const navigate = useNavigate();
-    
+    const location = useLocation();
+    const message = location.state?.message || 'Action completed successfully!';
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         navigate('/login');
     };
 
-    return(
+    return (
         <>
-        <div>
-            <p>Application submitted successfully!</p>
-            {/* <a href="Profile.jsx">Back to profile</a> */}
-            <a href="#" onClick={() => navigate('/profile')}>Back to profile</a>
-            <br />
-            <a href="#" onClick={handleLogout}>Logout</a>
-            {/* <a href="Logout.jsx">Logout</a> */}
+        <div className="success-container">
+            <h2>Success</h2>
+            <p>{message}</p>
+            <button onClick={() => navigate('/profile')}>Back to Profile</button>
+            <button onClick={handleLogout}>Logout</button>
         </div>
         </>
     );

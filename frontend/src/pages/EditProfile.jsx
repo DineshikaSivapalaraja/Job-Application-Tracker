@@ -31,7 +31,7 @@ export default function EditProfile() {
         const response = await fetch(`http://127.0.0.1:8000/profile`, {
             method: 'PUT',
             headers: {
-            'Content-Type': 'application/json',
+                'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(updateData),
@@ -39,8 +39,9 @@ export default function EditProfile() {
         if (response.ok) {
             const data = await response.json();
             console.log('Update response:', data); 
-            setSuccess('Profile updated successfully!');
-            setTimeout(() => navigate('/profile'), 1000);
+            // setSuccess('Profile updated successfully!');
+            // setTimeout(() => navigate('/profile'), 1000);
+            navigate('/success', { state: { message: 'Profile updated successfully!' } });
         } else {
             const data = await response.json();
             setError(data.detail || 'Update failed');

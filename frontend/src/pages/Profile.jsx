@@ -78,12 +78,18 @@ export default function Profile() {
         navigate('/admin'); //navigate to admin dashboard
     };
 
+    const handleHome = () => {
+        navigate('/'); //navigate to home
+    };
+
     return (
         <>
         {/* <div> */}
             <div className='form-box2'>
             
             <h2>Profile</h2>
+            <button onClick={handleHome}>Back to Home</button>
+
             {loading && <p>Loading...</p>}
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {user && (

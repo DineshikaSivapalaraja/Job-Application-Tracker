@@ -5,6 +5,7 @@ export default function LogIn() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -19,7 +20,9 @@ export default function LogIn() {
         const data = await response.json();
         if (response.ok) {
             localStorage.setItem('token', data.access_token);
-            navigate('/profile');
+            // navigate('/profile');
+            setSuccess('Logged in successfully!');
+            setTimeout(() => navigate('/profile'), 1000);
         } else {
             setError(data.detail || 'Login failed');
         }

@@ -24,7 +24,8 @@ export default function SignUp() {
         });
         const data = await response.json();
         if (response.ok) {
-            navigate('/login');
+            // navigate('/login');
+            navigate('/success', { state: { message: 'Account created successfully! Please log in.' } });
         } else {
             setError(data.detail || 'Registration failed');
         }

@@ -1,6 +1,7 @@
 // import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import './App.css'
+import './App.css';
+import Home from './pages/Home.jsx';
 import SignUp from './pages/Signup.jsx';
 import LogIn from './pages/Login.jsx';
 import ApplicationForm from './pages/ApplicationForm.jsx';
@@ -9,6 +10,7 @@ import Profile from './pages/Profile.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import Logout from './pages/Logout.jsx';
 import EditProfile from './pages/EditProfile.jsx';
+import AdminSignup  from './pages/AdminSignup.jsx';
 
 function App() {
 
@@ -17,8 +19,10 @@ function App() {
     <div>
       <Router>
         <Routes>
-          <Route path="/login" element={<LogIn />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/admin-signup" element={<AdminSignup />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/login" element={<LogIn />} />
           <Route path="/application" element={<ApplicationForm />} />
           <Route path="/success" element={<Success />} />
           <Route path="/profile" element={<Profile />} />
