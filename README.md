@@ -105,7 +105,7 @@ The main goal of this app is to:
 ## Environment Variables
 
 - **Backend:**  
-  See `backend/.env.example` for all required variables.
+  - See `backend/.env.example` for all required variables.
 
 - **Frontend:**  
   - `VITE_API_URL` — Base URL for backend API.
