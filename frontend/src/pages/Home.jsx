@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -44,9 +44,12 @@ export default function Home() {
                 <div className="auth-links">
                     {user.role === 'admin' ? (
                         <Link to="/admin" className="link">Go to Admin Dashboard</Link>
-                    ) : (
+                    ) 
+                    : (
                         <Link to="/profile" className="link">Go to Profile</Link>
-                    )}
+                    )
+                    }
+                    <Link to="/logout" className="link">Log Out</Link>
                 </div>
             )}
         </div>

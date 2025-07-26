@@ -105,6 +105,7 @@ export default function Profile() {
                 <label>CV: {user.cv}</label><br /> */}
                 <br />
                 <button onClick={handleEditProfile}>Edit Profile</button>
+                <button onClick={() => navigate('/logout')}>Log Out</button>
                 <br />
                 {user.role === 'admin' && (
                     <button onClick={handleAdminDashboard}>Admin Dashboard</button>

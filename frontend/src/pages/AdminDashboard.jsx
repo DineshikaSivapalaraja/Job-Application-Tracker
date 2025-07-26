@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -81,6 +82,12 @@ export default function AdminDashboard() {
         <>
         <div className='form-box2'>
         <h2>Applicants List</h2>
+        <br></br>
+
+        <Link to="/profile" className="link">Go to Profile</Link>
+        <br></br>
+        <Link to="/logout" className="link">Log Out</Link>
+
         <div className='table-container'>
         <table className='admin-dashboard'>
             <tr>
